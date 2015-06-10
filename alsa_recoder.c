@@ -66,7 +66,6 @@
 
 wav_format *wav = NULL;
 int fd;
-// #define DURATION_TIME 3
 
 // 准备WAV格式参数
 void prepare_wav_params(wav_format *wav)
@@ -82,11 +81,8 @@ void prepare_wav_params(wav_format *wav)
 	wav->format.byte_rate = LE_INT(wav->format.sample_rate
 				* wav->format.block_align);
 	wav->data.data_id = DATA;
-	// wav->data.data_size = LE_INT(DURATION_TIME
-				// * wav->format.byte_rate);
 	wav->head.id = RIFF;
 	wav->head.format = WAVE;
-	// wav->head.size = LE_INT(36 + wav->data.data_size);
 }
 
 // 设置WAV格式参数
@@ -177,29 +173,24 @@ uint32_t total_bytes = 0;
 // 从PCM设备录取音频数据，并写入fd中
 void recorder(int fd, pcm_container *sound, wav_format *wav)
 {
-	// 1：写WAV格式的文件头
-	// write(fd, &wav->head, sizeof(wav->head));
-	// write(fd, &wav->format, sizeof(wav->format));
-	// write(fd, &wav->data, sizeof(wav->data));
-
+	// 1：预留相应的大小给WAV格式头，等录音完毕再写格式头
 	lseek(fd, sizeof(wav), SEEK_SET);
 
 	// 2：写PCM数据
-	// uint32_t total_bytes = wav->data.data_size;
 	uint32_t nwrite = 0;
 
-	// while(total_bytes > 0)
 	while(1)
 	{
 		uint32_t total_frames = total_bytes / (sound->bytes_per_frame);
-		// snd_pcm_uframes_t n = MIN(total_frames, sound->frames_per_period);
 		snd_pcm_uframes_t n = sound->frames_per_period;
 
 		uint32_t frames_read = read_pcm_data(sound, n);
 		nwrite = write(fd, sound->period_buf, frames_read * sound->bytes_per_frame);
-		// total_bytes -= (frames_read * sound->bytes_per_frame);
 		total_bytes += nwrite;
+
+		#ifdef DEBUG
 		printf("%d\n", total_bytes);
+		#endif
 	}
 }
 
@@ -226,10 +217,18 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	printf("\n按下\"ctrl + c\" 来停止录音\n\n");
 	signal(SIGINT, stop);
 
+	int counting_down = 3;
+	while(counting_down >= 0)
+	{
+		printf("%d 秒后开始录音...\n", counting_down);
+		sleep(1);
+		counting_down--;
+	}
+
 	// 1：打开WAV格式文件
-	// int fd = open(argv[1], O_CREAT|O_WRONLY|O_TRUNC, 0777);
 	fd = open(argv[1], O_CREAT|O_WRONLY|O_TRUNC, 0777);
 	if(fd == -1)	
 	{
@@ -250,7 +249,6 @@ int main(int argc, char **argv)
 
 	// 3: 准备并设置WAV格式参数
 	wav = calloc(1, sizeof(wav_format));
-	// wav_format *wav = calloc(1, sizeof(wav_format));
 	prepare_wav_params(wav);
 	set_wav_params(sound, wav);
 
